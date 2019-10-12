@@ -1,0 +1,295 @@
+[[define "title"]]
+PbrtCraft Dashbroad
+[[end]]
+
+[[define "content"]]
+<div id="app">
+  <div class="row">
+    <div class="col-6">
+      <h3>Scene settings:</h3>
+      <b-container fluid>
+        <b-row>
+          <b-col sm="3">
+            <label for="txtPlayer">Player Name</label>
+          </b-col>
+          <b-col sm="9">
+            <b-form-select id="txtPlayer" :options="players" v-model="player_name"></b-form-select>
+          </b-col>
+        </b-row>
+        <b-row>
+          <b-col sm="3">
+            <label for="txtRadius">Radius(From player position)</label>
+          </b-col>
+          <b-col sm="9">
+            <b-form-input id="txtRadius" type="number" min="4" v-model="radius"></b-form-input>
+          </b-col>
+        </b-row>
+      </b-container>
+      <h3>Rendering parameters:</h3>
+      <b-container fluid>
+        <b-row>
+          <b-col sm="3">
+            <label for="txtSample">Sample</label>
+          </b-col>
+          <b-col sm="9">
+            <b-form-input id="txtSample" type="number" min="1" v-model="sample"></b-form-input>
+          </b-col>
+        </b-row>
+        <b-row>
+          <b-col sm="3">
+            <label>Rendering Method</label>
+          </b-col>
+          <b-col sm="9">
+            <b-button v-b-modal.method-selecion>Method Setting</b-button>
+            {{method.name}}
+          </b-col>
+        </b-row>
+        <b-row>
+          <b-col sm="3">
+            <label>Camera<label>
+          </b-col>
+          <b-col sm="9">
+            <b-button v-b-modal.camera-selecion>Camera Setting</b-button>
+            {{camera.name}}
+          </b-col>
+        </b-row>
+      </b-container>
+      <h3>Phenomenons settings:</h3>
+      <b-container fluid>
+        <b-button variant="primary" v-b-modal.ph-create-selecion>Create phenomenons</b-button>
+        <table class="table table-striped hover">
+          <thead>
+            <tr>
+              <td>Name</td>
+              <td>Params</td>
+              <td>Ops</td>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(ph, index) in phenomenons">
+              <td>{{ph.name}}</td>
+              <td>{{ph.params}}</td>
+              <td>
+                <b-btn variant="info" @click="startEditPhenomenon(index)">Edit</b-btn>
+                <b-btn variant="warning" @click="deletePheomenon(index)">Delete</b-btn>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </b-container>
+      <h3>Operations:</h3>
+      <b-container fluid>
+        <b-btn squared variant="primary" @click="render" :disabled="!can_render">Render</b-btn>
+        <b-btn squared variant="warning" @click="stop" v-show="!can_render">Stop</b-btn>
+        <div v-show="render_status.show">
+          <b-spinner small></b-spinner>
+          <small>{{render_status.msg}}</small>
+        </div>
+      </b-container>
+    </div>
+    <div class="col-5">
+      <b-button squared variant="primary" @click="updateImg">Update Image</b-button>
+      <b-img :src="render_src" fluid-grow></b-img>
+    </div>
+    <div class="col-1"></div>
+  </div>
+
+  <class-selection id="method-selecion" :types="method_types" title="Method Setting" @ok="" v-model="method">
+  </class-selection>
+
+  <class-selection id="camera-selecion" :types="camera_types" title="Camera Setting" @ok="" v-model="camera">
+  </class-selection>
+
+  <class-selection id="ph-create-selecion" :types="phenomenon_types" title="Create Phenomenon" @ok="pushPhenomenon"
+    v-model="createPhenomenon">
+  </class-selection>
+
+  <class-selection id="ph-edit-selecion" :types="phenomenon_types" title="Edit Phenomenon" @ok="finishEditPhenomenon"
+    v-model="editPhenomenon">
+  </class-selection>
+</div>
+
+
+<!--<script src="/static/js/main.js"></script>-->
+
+<script>
+  Vue.component("class-selection", {
+    template: `
+<b-modal :id="id" :title="title" @ok="triggerOk">
+  <b-form-group label="Name:" :label-for="id + '-name'">
+    <b-form-select :id="id + '-name'" :options="names" v-model="value.name"
+      @change="updateParams(); $forceUpdate()" required>
+    </b-form-select>
+  </b-form-group>
+  <div v-for="param in types[names.indexOf(value.name)].init_func.params">
+    <b-form-group :label="param.name" :label-for="id + '-param-' + param.name">
+      <b-form-input :id="id + '-param-' + param.name" @input="updateParams(); $forceUpdate()"
+        v-model="gparams[value.name][param.name]" required>
+      </b-form-input>
+    </b-form-group>
+  </div>
+</b-modal> 
+    `,
+    props: ['value', 'types', 'title', 'id'],
+    data: function () {
+      return {
+        names: [],
+        gparams: {},
+      }
+    },
+    watch: {
+      types: function () {
+        that = this;
+        this.types.forEach(function (tp) {
+          name = tp.name;
+          that.names.push(name);
+          that.gparams[name] = {};
+          tp.init_func.params.forEach(function (param) {
+            that.gparams[name][param.name] = param.default_value;
+          });
+        });
+        if (this.names.length) {
+          this.value.name = this.names[0];
+          this.updateParams();
+        }
+        console.log(this.names)
+      }
+    },
+    created: function () {
+    },
+    methods: {
+      triggerOk: function () {
+        this.$emit('ok');
+      },
+      updateParams: function () {
+        console.log("update params")
+        params = this.gparams[this.value.name];
+        console.log(params)
+        index = this.names.indexOf(this.value.name)
+        this.types[index].init_func.params.forEach(function (param) {
+          name = param.name;
+          console.log(name, params[name])
+          if (param.type == "int") {
+            params[name] = parseInt(params[name]);
+          } else if (param.type == "float") {
+            params[name] = parseFloat(params[name]);
+          }
+        });
+        this.value.params = params;
+      },
+    },
+  });
+
+  var app = new Vue({
+    el: '#app',
+    data: {
+      players: [],
+      player_name: "",
+      sample: "16",
+      radius: "4",
+      method_types: [],
+      method: {
+        name: "",
+        params: {},
+      },
+      camera_types: [],
+      camera: {
+        name: "",
+        params: {},
+      },
+      phenomenon_types: [],
+      phenomenons: [],
+      createPhenomenon: {
+        name: "",
+        params: {},
+      },
+      editPhenomenon: {
+        edit_index: 0,
+        name: "",
+        params: {},
+      },
+      render_src: "https://via.placeholder.com/600",
+      timer: null,
+      can_render: true,
+      render_status: {
+        show: false,
+        msg: "",
+      },
+    },
+    created: function () {
+      this.$http.post("/getuser").then(function (r) {
+        this.players = r.data;
+        this.player_name = this.players[0];
+      });
+      this.$http.post("/gettype").then(function (r) {
+        this.camera_types = r.data.camera;
+        this.phenomenon_types = r.data.phenomenon;
+        this.method_types = r.data.method;
+      });
+    },
+    mounted: function () {
+      this.updateImg();
+    },
+    methods: {
+      stop: function () {
+        this.$http.post("/stop");
+      },
+      render: function () {
+        this.can_render = false;
+        this.$http.post("/render", {
+          sample: this.sample,
+          radius: this.radius,
+          method: this.method,
+          camera: this.camera,
+          phenomenons: this.phenomenons,
+        });
+        this.timer = setInterval(this.updateStatus, 3000)
+      },
+      updateStatus: function () {
+        this.$http.get("/getstatus").then(function (r) {
+          status = r.body;
+          this.render_status.show = status != "idle";
+          this.can_render = status == "idle";
+          if (status == "idle") {
+            this.render_status.msg = "";
+            this.updateImg();
+            clearInterval(this.timer)
+          } else if (status == "mc2pbrt" || status == "pbrt") {
+            this.render_status.msg = "Running " + status + "...";
+          }
+        })
+      },
+      pushPhenomenon: function () {
+        this.phenomenons.push({
+          name: this.createPhenomenon.name,
+          params: this.copyDict(this.createPhenomenon.params),
+        })
+      },
+      startEditPhenomenon: function (index) {
+        this.editPhenomenon.edit_index = index;
+        this.editPhenomenon.name = this.phenomenons[index].name;
+        this.editPhenomenon.params = this.copyDict(this.phenomenons[index].params);
+        this.$bvModal.show("ph-edit-selecion");
+      },
+      finishEditPhenomenon: function () {
+        i = this.editPhenomenon.edit_index;
+        this.phenomenons[i].name = this.editPhenomenon.name;
+        this.phenomenons[i].params = this.copyDict(this.editPhenomenon.params);
+      },
+      deletePheomenon: function (index) {
+        this.phenomenons.splice(index, 1)
+      },
+      updateImg: function () {
+        this.$http.get("/getimg").then(function (r) {
+          if (r.status == 200) {
+            this.render_src = "data:image/jpeg;base64," + r.body;
+          }
+        })
+      },
+      copyDict: function (d) {
+        return JSON.parse(JSON.stringify(d));
+      }
+    }
+  })
+</script>
+[[end]]

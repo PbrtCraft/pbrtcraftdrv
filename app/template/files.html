@@ -1,0 +1,105 @@
+[[define "title"]]
+PbrtCraft Files
+[[end]]
+
+[[define "content"]]
+<div id="app">
+  <ul id="demo">
+    <div class="row">
+      <div class="col-6">
+        <tree-item class="item" :item="root" @show-file="showFile"></tree-item>
+      </div>
+      <div class="col-5">
+        <img :src="filesrc" class="w-100">
+      </div>
+    </div>
+  </ul>
+</div>
+
+<style>
+  div#app {
+    font-family: Menlo, Consolas, monospace;
+  }
+
+  .item {
+    cursor: pointer;
+  }
+
+  .bold {
+    font-weight: bold;
+  }
+
+  ul {
+    padding-left: 1em;
+    line-height: 1.5em;
+    list-style-type: dot;
+  }
+</style>
+
+<script type="text/x-template" id="item-template">
+  <li>
+    <div @click="toggle">
+      {{item.name}}
+      <span>[{{ isOpen ? '-' : '+' }}]</span>
+    </div>
+    <ul v-if="isOpen">
+      <li v-for="file in item.files">
+        <a @click="$emit('show-file', file.path);">{{file.name}}</a>
+      </li>
+      <tree-item
+        class="item"
+        v-for="(folder, index) in item.folders"
+        :key="index"
+        :item="folder"
+        @show-file="$emit('show-file', $event)"
+      ></tree-item>
+    </ul>
+  </li>
+</script>
+
+<script>
+
+  // define the tree-item component
+  Vue.component('tree-item', {
+    template: '#item-template',
+    props: {
+      item: Object
+    },
+    data: function () {
+      return {
+        isOpen: false
+      }
+    },
+    methods: {
+      toggle: function () {
+        this.isOpen = !this.isOpen
+      },
+    }
+  })
+
+  var app = new Vue({
+    el: '#app',
+    data: {
+      root: Object,
+      filesrc: "",
+    },
+    created: function () {
+      this.$http.post("/getfiles").then(function (r) {
+        this.root = r.data;
+      });
+    },
+    methods: {
+      showFile: function (path) {
+        if (this.fileExt(path) == "png") {
+          this.filesrc = "/scenes/" + path;
+        }
+      },
+      fileExt: function (filename) {
+        return filename.split('.').pop();
+      }
+    }
+  })
+</script>
+
+
+[[end]]

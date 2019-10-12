@@ -1,0 +1,22 @@
+[[define "title"]]
+PbrtCraft Render Result
+[[end]]
+
+[[define "content"]]
+<script src="https://unpkg.com/vuejs-panorama@latest/dist/Panorama.js"></script>
+<div id="app">
+  [[if .Pano]]
+  <Panorama source="[[.ImgSrc]]" caption="Awesome Panorama" />
+  [[else]]
+  <img src="[[.ImgSrc]]">
+  [[end]]
+</div>
+
+<script>
+  new Vue({
+    el: '#app'
+  })
+</script>
+
+
+[[end]]
