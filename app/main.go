@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"html/template"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"path"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/PbrtCraft/pbrtcraftdrv/filetree"
 	"github.com/PbrtCraft/pbrtcraftdrv/mcwdrv"
@@ -157,7 +160,7 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 func usersHandler(w http.ResponseWriter, r *http.Request) {
 	users, err := listUsers()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		fmt.Fprint(w, "[]")
 		return
 	}
@@ -173,23 +176,65 @@ func usersHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func listUsers() ([]string, error) {
-	bytes, err := ioutil.ReadFile(path.Join(appconf.Minecraft.Directory, "usercache.json"))
-	if err != nil {
-		return nil, fmt.Errorf("app.listUsers: %s", err)
-	}
-	var userData []struct {
-		Name string `json:"name"`
-	}
-	err = json.Unmarshal(bytes, &userData)
+	files, err := ioutil.ReadDir(path.Join(appconf.Minecraft.Directory, "world", "playerdata"))
 	if err != nil {
 		return nil, fmt.Errorf("app.listUsers: %s", err)
 	}
 
 	users := []string{}
-	for _, d := range userData {
-		users = append(users, d.Name)
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		fn := file.Name()
+		playerName, err := uuidToName(fn[0 : len(fn)-4])
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+		users = append(users, playerName)
 	}
+
 	return users, nil
+}
+
+func uuidToName(uuid string) (string, error) {
+	url := fmt.Sprintf("https://api.mojang.com/user/profiles/%s/names",
+		strings.Replace(uuid, "-", "", -1))
+	client := http.Client{
+		Timeout: time.Second * 2,
+	}
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return "", fmt.Errorf("app.uuidToName: %s", err)
+	}
+	req.Header.Set("User-Agent", "Get Name By UUID")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("app.uuidToName: %s", err)
+	}
+	defer resp.Body.Close()
+	bytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("app.uuidToName: %s", err)
+	}
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("app.uuidToName: Request StatusCode = %d, %s",
+			resp.StatusCode, string(bytes))
+	}
+
+	var tmp []struct {
+		Name string `json:"name"`
+	}
+	err = json.Unmarshal(bytes, &tmp)
+	if err != nil {
+		return "", fmt.Errorf("app.uuidToName: %s", err)
+	}
+	if len(tmp) == 0 {
+		return "", fmt.Errorf("app.uuidToName: cannot found player by uuid %s", uuid)
+	}
+	return tmp[0].Name, nil
 }
 
 func imgHandler(w http.ResponseWriter, r *http.Request) {
