@@ -7,12 +7,14 @@ import (
 	"path/filepath"
 )
 
+// File stores simple file info
 type File struct {
 	Name string `json:"name"`
 	Path string `json:"path"`
 	Size int64  `json:"size"`
 }
 
+// Folder stores list of files and folders in the folder
 type Folder struct {
 	Name    string    `json:"name"`
 	Path    string    `json:"path"`
@@ -20,6 +22,7 @@ type Folder struct {
 	Folders []*Folder `json:"folders"`
 }
 
+// GetFolder travel throught a folder and return a Folder
 func GetFolder(root string) (*Folder, error) {
 	absRoot, err := filepath.Abs(root)
 	if err != nil {
@@ -69,6 +72,7 @@ func getFolder(root, prefix string) (*Folder, error) {
 	}, nil
 }
 
+// Print show the structure in the folder
 func (f *Folder) Print() {
 	f.print("")
 }
