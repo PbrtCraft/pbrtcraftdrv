@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -77,10 +78,17 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func renderHandler(w http.ResponseWriter, r *http.Request) {
-	rc := mcwdrv.RenderConfig{
-		World: "/home/mukyu99/Minecraft/world",
-	}
 	var err error
+	absWorldPath, err := filepath.Abs(path.Join(appconf.Minecraft.Directory, "world"))
+	if err != nil {
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	rc := mcwdrv.RenderConfig{
+		World: absWorldPath,
+	}
 	decoder := json.NewDecoder(r.Body)
 	var t struct {
 		Player      string         `json:"player"`
