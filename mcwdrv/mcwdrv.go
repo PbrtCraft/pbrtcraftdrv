@@ -5,22 +5,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
+// MCWStatus record the status of MCWDriver
 type MCWStatus int
 
 const (
+	// StatusIdle -> MCW is idle and can compile
 	StatusIdle MCWStatus = iota
+
+	// StatusReady -> MCW is config to ready for compiling
 	StatusReady
+
+	// StatusMc2pbrt -> MCW is running mc2pbrt
 	StatusMc2pbrt
+
+	// StatusPbrt -> MCW is running pbrt
 	StatusPbrt
 )
 
+// MCWDriver manage mc2pbrt and pbrt to render a scene of minecraft
 type MCWDriver struct {
 	mutex      sync.Mutex
 	status     MCWStatus
@@ -38,11 +49,14 @@ type MCWDriver struct {
 	}
 }
 
+// Class is a type in Minecraft render config
 type Class struct {
 	Name   string      `json:"name"`
 	Params interface{} `json:"params"`
 }
 
+// RenderConfig is Minecraft scene render config for mc2pbrt
+// more info ref: https://github.com/PbrtCraft/mc2pbrt
 type RenderConfig struct {
 	World  string
 	Player string
@@ -54,8 +68,10 @@ type RenderConfig struct {
 	Phenomenons []Class
 }
 
+// ErrDriverNotIdel occur when try to compile when compiling
 var ErrDriverNotIdel = fmt.Errorf("mcwdrv.Compile: Driver status not idle")
 
+// NewMCWDriver return a minecraft world driver
 func NewMCWDriver(workdir, mc2pbrtMain, pbrtBin string) (*MCWDriver, error) {
 	ret := &MCWDriver{}
 	var err error
@@ -76,6 +92,7 @@ func NewMCWDriver(workdir, mc2pbrtMain, pbrtBin string) (*MCWDriver, error) {
 	return ret, nil
 }
 
+// Compile start a goroutine to generate pbrt file and render
 func (drv *MCWDriver) Compile(rc RenderConfig) error {
 	drv.mutex.Lock()
 	if drv.status != StatusIdle {
@@ -99,8 +116,15 @@ func (drv *MCWDriver) compile() {
 
 	var err error
 
+	log.Println("Start running mc2pbrt...")
 	drv.setStatus(StatusMc2pbrt)
-	drv.cmdMc2pbrt = exec.Command("python3", drv.path.mc2pbrtMain, "--filename", "config.json")
+	mc2pbrtMain := drv.path.mc2pbrtMain
+	if strings.HasSuffix(mc2pbrtMain, ".py") {
+		// TODO: which python should call?
+		drv.cmdMc2pbrt = exec.Command("python3", drv.path.mc2pbrtMain, "--filename", "config.json")
+	} else {
+		drv.cmdMc2pbrt = exec.Command(drv.path.mc2pbrtMain, "--filename", "config.json")
+	}
 	drv.cmdMc2pbrt.Dir = drv.path.workdir
 	drv.cmdMc2pbrt.Stdout = os.Stdout
 	drv.cmdMc2pbrt.Stderr = os.Stderr
@@ -109,7 +133,9 @@ func (drv *MCWDriver) compile() {
 		drv.lastCompile.err = fmt.Errorf("mc2pbrt: %s", err)
 		return
 	}
+	log.Println("Start running mc2pbrt...ok")
 
+	log.Println("Start running pbrt...")
 	drv.setStatus(StatusPbrt)
 	targetPbrt := path.Join(drv.path.workdir, "scenes", "target.pbrt")
 	drv.cmdPbrt = exec.Command(drv.path.pbrtBin, targetPbrt, "--outfile", "mc.png")
@@ -121,10 +147,12 @@ func (drv *MCWDriver) compile() {
 		drv.lastCompile.err = fmt.Errorf("pbrt: %s", err)
 		return
 	}
+	log.Println("Start running pbrt...ok")
 
 	drv.lastCompile.err = nil
 }
 
+// StopCompile stop mc2pbrt and pbrt process
 func (drv *MCWDriver) StopCompile() error {
 	if drv.cmdMc2pbrt != nil {
 		drv.cmdMc2pbrt.Process.Kill()
@@ -141,14 +169,17 @@ func (drv *MCWDriver) setStatus(s MCWStatus) {
 	drv.mutex.Unlock()
 }
 
+// GetStatus return the status of driver
 func (drv *MCWDriver) GetStatus() MCWStatus {
 	return drv.status
 }
 
+// GetLastCompileResult return the last render err
 func (drv *MCWDriver) GetLastCompileResult() error {
 	return drv.lastCompile.err
 }
 
+// GetImageBase64 return the render result in base64
 func (drv *MCWDriver) GetImageBase64() (string, error) {
 	bytes, err := ioutil.ReadFile(path.Join(drv.path.workdir, "mc.png"))
 	if err != nil {

@@ -7,7 +7,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 )
 
-type config struct {
+type appConfig struct {
 	Path struct {
 		Workdir     string `yaml:"workdir"`      // Path to workdir
 		Mc2pbrtMain string `yaml:"mc2pbrt_main"` // Path to mc2pbrt/main.py
@@ -21,20 +21,34 @@ type config struct {
 	} `yaml:"minecraft"`
 }
 
-func getConfig(filename string) (*config, error) {
+type srvConfig struct {
+	Port string `json:"port"`
+}
+
+func getAppConfig(filename string) (*appConfig, error) {
 	bytes, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("app.getConfig: %s", err)
+		return nil, fmt.Errorf("app.getAppConfig: %s", err)
 	}
 
-	var c config
-	// Default values
-	c.Path.Workdir = "../../workdir/"
-	c.Path.Mc2pbrtMain = "../../mc2pbrt/mc2pbrt/main.py"
-	c.Path.PbrtBin = "../../pbrt-v3-minecraft/build/pbrt"
+	var c appConfig
 	err = yaml.Unmarshal(bytes, &c)
 	if err != nil {
-		return nil, fmt.Errorf("app.getConfig: %s", err)
+		return nil, fmt.Errorf("app.getAppConfig: %s", err)
+	}
+	return &c, nil
+}
+
+func getSrvConfig(filename string) (*srvConfig, error) {
+	bytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("app.getSrvConfig: %s", err)
+	}
+
+	var c srvConfig
+	err = yaml.Unmarshal(bytes, &c)
+	if err != nil {
+		return nil, fmt.Errorf("app.getSrvConfig: %s", err)
 	}
 	return &c, nil
 }

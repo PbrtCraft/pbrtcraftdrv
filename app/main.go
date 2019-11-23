@@ -11,20 +11,21 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/PbrtCraft/pbrtcraftdrv/filetree"
 	"github.com/PbrtCraft/pbrtcraftdrv/mcwdrv"
 )
 
 var mcwDriver *mcwdrv.MCWDriver
-var appconf *config
+var appconf *appConfig
+var srvconf *srvConfig
+var players []string
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.New("").Delims("[[", "]]").
 		ParseFiles("template/basic.html", "template/index.html")
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -36,7 +37,7 @@ func resultHandler(w http.ResponseWriter, r *http.Request) {
 		ParseFiles("template/basic.html", "template/result.html")
 
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -48,7 +49,7 @@ func resultHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -68,7 +69,7 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.New("").Delims("[[", "]]").
 		ParseFiles("template/basic.html", "template/files.html")
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -77,12 +78,12 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 
 func renderHandler(w http.ResponseWriter, r *http.Request) {
 	rc := mcwdrv.RenderConfig{
-		World:  "/home/mukyu99/Minecraft/world",
-		Player: "Mudream",
+		World: "/home/mukyu99/Minecraft/world",
 	}
 	var err error
 	decoder := json.NewDecoder(r.Body)
 	var t struct {
+		Player      string         `json:"player"`
 		Sample      string         `json:"sample"`
 		Radius      string         `json:"radius"`
 		Method      mcwdrv.Class   `json:"method"`
@@ -91,31 +92,32 @@ func renderHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	err = decoder.Decode(&t)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	rc.Sample, err = strconv.Atoi(t.Sample)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	rc.Radius, err = strconv.Atoi(t.Radius)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
+	rc.Player = t.Player
 	rc.Method = t.Method
 	rc.Camera = t.Camera
 	rc.Phenomenons = t.Phenomenons
 
 	err = mcwDriver.Compile(rc)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -128,14 +130,14 @@ func stopHandler(w http.ResponseWriter, r *http.Request) {
 func getfilesHandler(w http.ResponseWriter, r *http.Request) {
 	ft, err := filetree.GetFolder(path.Join(appconf.Path.Workdir, "scenes"))
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	bytes, err := json.Marshal(ft)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -158,16 +160,9 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func usersHandler(w http.ResponseWriter, r *http.Request) {
-	users, err := listUsers()
+	bytes, err := json.Marshal(players)
 	if err != nil {
 		log.Println(err)
-		fmt.Fprint(w, "[]")
-		return
-	}
-
-	bytes, err := json.Marshal(users)
-	if err != nil {
-		fmt.Println(err)
 		fmt.Fprint(w, "[]")
 		return
 	}
@@ -189,7 +184,7 @@ func listUsers() ([]string, error) {
 		fn := file.Name()
 		playerName, err := uuidToName(fn[0 : len(fn)-4])
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			continue
 		}
 		users = append(users, playerName)
@@ -201,9 +196,7 @@ func listUsers() ([]string, error) {
 func uuidToName(uuid string) (string, error) {
 	url := fmt.Sprintf("https://api.mojang.com/user/profiles/%s/names",
 		strings.Replace(uuid, "-", "", -1))
-	client := http.Client{
-		Timeout: time.Second * 2,
-	}
+	client := http.Client{}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return "", fmt.Errorf("app.uuidToName: %s", err)
@@ -248,31 +241,55 @@ func imgHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	var err error
-	appconfFilenamePtr := flag.String("appconf", "appconfig.yaml", "Config filename")
+	appconfFilenamePtr := flag.String("appconf", "appconfig.yaml", "App Config filename")
+	srvconfFilenamePtr := flag.String("srvconf", "srvconfig.yaml", "Server Config filename")
 	flag.Parse()
 
-	appconf, err = getConfig(*appconfFilenamePtr)
+	log.Println("Start init app config...")
+	appconf, err = getAppConfig(*appconfFilenamePtr)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
+	log.Println("Start init app config...DONE")
 
+	log.Println("Start init srv config...")
+	srvconf, err = getSrvConfig(*srvconfFilenamePtr)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	log.Println("Start init srv config...DONE")
+
+	log.Println("Start init srv player list...")
+	players, err = listUsers()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	log.Println("Start init srv player list...DONE")
+
+	log.Println("Start reading python types...")
 	err = initTypes(appconf.PythonFile)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
+	log.Println("Start reading python types...DONE")
 
+	log.Println("Start init mc driver...")
 	mcwDriver, err = mcwdrv.NewMCWDriver(
 		appconf.Path.Workdir,
 		appconf.Path.Mc2pbrtMain,
 		appconf.Path.PbrtBin,
 	)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
+	log.Println("Start init mc driver...DONE")
 
+	log.Println("Start init server...")
 	http.HandleFunc("/", mainHandler)
 	http.HandleFunc("/result", resultHandler)
 	http.HandleFunc("/files", filesHandler)
@@ -290,6 +307,8 @@ func main() {
 
 	fsScenes := http.FileServer(http.Dir(path.Join(appconf.Path.Workdir, "scenes")))
 	http.Handle("/scenes/", http.StripPrefix("/scenes/", fsScenes))
+	log.Println("Start init server...DONE")
 
-	http.ListenAndServe(":8080", nil)
+	log.Printf("Start listen at :%s...", srvconf.Port)
+	http.ListenAndServe(":"+srvconf.Port, nil)
 }
