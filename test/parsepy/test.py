@@ -2,7 +2,7 @@ def create(name, args):
     """Create Test"""
     type_map = {
         "A": TestA,
-        "A": TestB,
+        "B": TestB,
     }
     if name in type_map:
         return type_map[name](**args)
