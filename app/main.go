@@ -290,6 +290,7 @@ func main() {
 		appconf.Path.Workdir,
 		appconf.Path.Mc2pbrtMain,
 		appconf.Path.PbrtBin,
+		appconf.Path.LogDir,
 	)
 	if err != nil {
 		log.Println(err)
@@ -309,6 +310,11 @@ func main() {
 	http.HandleFunc("/getfiles", getfilesHandler)
 	http.HandleFunc("/render", renderHandler)
 	http.HandleFunc("/stop", stopHandler)
+
+	http.HandleFunc("/log", logHandler)
+	http.HandleFunc("/log/list", listLogHandler)
+	http.HandleFunc("/log/get", getLogHandler)
+	http.HandleFunc("/log/delete", deleteLogHandler)
 
 	fsStatic := http.FileServer(http.Dir("static"))
 	http.Handle("/static/", http.StripPrefix("/static/", fsStatic))

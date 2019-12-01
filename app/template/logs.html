@@ -1,0 +1,53 @@
+[[define "title"]]
+PbrtCraft Render Result
+[[end]]
+
+[[define "content"]]
+
+<div id="app">
+  <table class="table table-striped hover">
+    <thead>
+      <tr>
+        <td>Filename</td>
+        <td>Operations</td>
+      </tr>
+    </thead>
+    <tbody>
+      <tr v-for="log_file in log_files">
+        <td>{{log_file}}</td>
+        <td>
+          <b-btn variant="info" :href="'/log/get?key=' + log_file">Lookup</b-btn>
+          <b-btn variant="warning" @click="deleteLog(log_file)">Delete</b-btn>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+  new Vue({
+    el: '#app',
+    data: {
+      log_files: [],
+      log_str: "",
+    },
+    created: function () {
+      this.$http.post("/log/list").then(function (r) {
+        this.log_files = r.data;
+      });
+    },
+    methods: {
+      deleteLog: function (log_file) {
+        this.$http.post("/log/delete?key=" + log_file).then(function (r) {
+          index = this.log_files.indexOf(log_file)
+          if (index > -1) {
+            this.log_files.slice(index, 1)
+          }
+        });
+      },
+    },
+  })
+</script>
+
+
+[[end]]

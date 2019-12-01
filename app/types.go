@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/PbrtCraft/pbrtcraftdrv/parsepy"
@@ -47,7 +48,8 @@ func typesHandler(w http.ResponseWriter, r *http.Request) {
 		"method":     methodTypeList,
 	}, "", " ")
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	fmt.Fprintf(w, string(bytes))

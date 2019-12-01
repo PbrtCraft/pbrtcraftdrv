@@ -10,8 +10,10 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // MCWStatus record the status of MCWDriver
@@ -46,6 +48,7 @@ type MCWDriver struct {
 		workdir     string
 		mc2pbrtMain string
 		pbrtBin     string
+		logDir      string
 	}
 }
 
@@ -72,7 +75,7 @@ type RenderConfig struct {
 var ErrDriverNotIdel = fmt.Errorf("mcwdrv.Compile: Driver status not idle")
 
 // NewMCWDriver return a minecraft world driver
-func NewMCWDriver(workdir, mc2pbrtMain, pbrtBin string) (*MCWDriver, error) {
+func NewMCWDriver(workdir, mc2pbrtMain, pbrtBin, logDir string) (*MCWDriver, error) {
 	ret := &MCWDriver{}
 	var err error
 	ret.path.mc2pbrtMain, err = filepath.Abs(mc2pbrtMain)
@@ -89,11 +92,21 @@ func NewMCWDriver(workdir, mc2pbrtMain, pbrtBin string) (*MCWDriver, error) {
 		return nil, fmt.Errorf("mcwdrv.NewMCWDriver: %s", err)
 	}
 
+	ret.path.logDir, err = filepath.Abs(logDir)
+	if err != nil {
+		return nil, fmt.Errorf("mcwdrv.NewMCWDriver: %s", err)
+	}
+
 	return ret, nil
 }
 
 // Compile start a goroutine to generate pbrt file and render
 func (drv *MCWDriver) Compile(rc RenderConfig) error {
+	err := drv.writeRenderConfig(rc)
+	if err != nil {
+		return fmt.Errorf("mcwdrv.Compile: %s", err)
+	}
+
 	drv.mutex.Lock()
 	if drv.status != StatusIdle {
 		return ErrDriverNotIdel
@@ -101,10 +114,6 @@ func (drv *MCWDriver) Compile(rc RenderConfig) error {
 	drv.status = StatusReady
 	drv.mutex.Unlock()
 
-	err := drv.writeRenderConfig(rc)
-	if err != nil {
-		return fmt.Errorf("mcwdrv.Compile: %s", err)
-	}
 	go drv.compile()
 	return nil
 }
@@ -116,6 +125,15 @@ func (drv *MCWDriver) compile() {
 
 	var err error
 
+	logFilename := strconv.FormatInt(time.Now().Unix(), 10) + ".log"
+	logFilepath := path.Join(drv.path.logDir, logFilename)
+	logFile, err := os.Create(logFilepath)
+	if err != nil {
+		drv.lastCompile.err = fmt.Errorf("open log file: %s", err)
+		return
+	}
+	defer logFile.Close()
+
 	log.Println("Start running mc2pbrt...")
 	drv.setStatus(StatusMc2pbrt)
 	mc2pbrtMain := drv.path.mc2pbrtMain
@@ -126,8 +144,8 @@ func (drv *MCWDriver) compile() {
 		drv.cmdMc2pbrt = exec.Command(drv.path.mc2pbrtMain, "--filename", "config.json")
 	}
 	drv.cmdMc2pbrt.Dir = drv.path.workdir
-	drv.cmdMc2pbrt.Stdout = os.Stdout
-	drv.cmdMc2pbrt.Stderr = os.Stderr
+	drv.cmdMc2pbrt.Stdout = logFile
+	drv.cmdMc2pbrt.Stderr = logFile
 	err = drv.cmdMc2pbrt.Run()
 	if err != nil {
 		drv.lastCompile.err = fmt.Errorf("mc2pbrt: %s", err)
@@ -140,8 +158,8 @@ func (drv *MCWDriver) compile() {
 	targetPbrt := path.Join(drv.path.workdir, "scenes", "target.pbrt")
 	drv.cmdPbrt = exec.Command(drv.path.pbrtBin, targetPbrt, "--outfile", "mc.png")
 	drv.cmdPbrt.Dir = drv.path.workdir
-	drv.cmdPbrt.Stdout = os.Stdout
-	drv.cmdPbrt.Stderr = os.Stderr
+	drv.cmdPbrt.Stdout = logFile
+	drv.cmdPbrt.Stderr = logFile
 	err = drv.cmdPbrt.Run()
 	if err != nil {
 		drv.lastCompile.err = fmt.Errorf("pbrt: %s", err)
@@ -187,6 +205,45 @@ func (drv *MCWDriver) GetImageBase64() (string, error) {
 	}
 	imgBase64 := base64.StdEncoding.EncodeToString(bytes)
 	return imgBase64, nil
+}
+
+// ListLogs return list of filename
+func (drv *MCWDriver) ListLogs() ([]string, error) {
+	files, err := ioutil.ReadDir(drv.path.logDir)
+	if err != nil {
+		return nil, fmt.Errorf("mcwdrv.ListLogs: %s", err)
+	}
+	ret := []string{}
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		if !strings.HasSuffix(file.Name(), ".log") {
+			continue
+		}
+		ret = append(ret, file.Name())
+	}
+	return ret, nil
+}
+
+// GetLog return log in string type
+func (drv *MCWDriver) GetLog(filename string) (string, error) {
+	logFilepath := path.Join(drv.path.logDir, filename)
+	bs, err := ioutil.ReadFile(logFilepath)
+	if err != nil {
+		return "", fmt.Errorf("mcwdrv.GetLog: %s", err)
+	}
+	return string(bs), nil
+}
+
+// DeleteLog delete log file
+func (drv *MCWDriver) DeleteLog(filename string) error {
+	logFilepath := path.Join(drv.path.logDir, filename)
+	err := os.Remove(logFilepath)
+	if err != nil {
+		return fmt.Errorf("mcwdrv.DeleteLog: %s", err)
+	}
+	return nil
 }
 
 func (drv *MCWDriver) writeRenderConfig(rc RenderConfig) error {
