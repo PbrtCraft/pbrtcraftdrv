@@ -5,13 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"path"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/PbrtCraft/pbrtcraftdrv/filetree"
 	"github.com/PbrtCraft/pbrtcraftdrv/mcwdrv"
@@ -20,7 +18,6 @@ import (
 var mcwDriver *mcwdrv.MCWDriver
 var appconf *appConfig
 var srvconf *srvConfig
-var players []string
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.New("").Delims("[[", "]]").
@@ -167,77 +164,6 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, str)
 }
 
-func usersHandler(w http.ResponseWriter, r *http.Request) {
-	bytes, err := json.Marshal(players)
-	if err != nil {
-		log.Println(err)
-		fmt.Fprint(w, "[]")
-		return
-	}
-
-	fmt.Fprint(w, string(bytes))
-}
-
-func listUsers() ([]string, error) {
-	files, err := ioutil.ReadDir(path.Join(appconf.Minecraft.Directory, "world", "playerdata"))
-	if err != nil {
-		return nil, fmt.Errorf("app.listUsers: %s", err)
-	}
-
-	users := []string{}
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-		fn := file.Name()
-		playerName, err := uuidToName(fn[0 : len(fn)-4])
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		users = append(users, playerName)
-	}
-
-	return users, nil
-}
-
-func uuidToName(uuid string) (string, error) {
-	url := fmt.Sprintf("https://api.mojang.com/user/profiles/%s/names",
-		strings.Replace(uuid, "-", "", -1))
-	client := http.Client{}
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return "", fmt.Errorf("app.uuidToName: %s", err)
-	}
-	req.Header.Set("User-Agent", "Get Name By UUID")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("app.uuidToName: %s", err)
-	}
-	defer resp.Body.Close()
-	bytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("app.uuidToName: %s", err)
-	}
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("app.uuidToName: Request StatusCode = %d, %s",
-			resp.StatusCode, string(bytes))
-	}
-
-	var tmp []struct {
-		Name string `json:"name"`
-	}
-	err = json.Unmarshal(bytes, &tmp)
-	if err != nil {
-		return "", fmt.Errorf("app.uuidToName: %s", err)
-	}
-	if len(tmp) == 0 {
-		return "", fmt.Errorf("app.uuidToName: cannot found player by uuid %s", uuid)
-	}
-	return tmp[0].Name, nil
-}
-
 func imgHandler(w http.ResponseWriter, r *http.Request) {
 	imgBase64, err := mcwDriver.GetImageBase64()
 	if err != nil {
@@ -269,13 +195,13 @@ func main() {
 	}
 	log.Println("Start init srv config...DONE")
 
-	log.Println("Start init srv player list...")
-	players, err = listUsers()
+	log.Println("Start init srv player....")
+	err = initPlayer(appconf.Minecraft.Directory)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	log.Println("Start init srv player list...DONE")
+	log.Println("Start init srv player...DONE")
 
 	log.Println("Start reading python types...")
 	err = initTypes(appconf.PythonFile)
