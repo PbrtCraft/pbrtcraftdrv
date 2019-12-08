@@ -10,10 +10,19 @@ PbrtCraft Dashbroad
       <b-container fluid>
         <b-row>
           <b-col sm="3">
+            <label for="txtWorld">World</label>
+          </b-col>
+          <b-col sm="9">
+            <b-form-select id="txtWorld" :options="worlds" v-model="select_world"></b-form-select>
+          </b-col>
+        </b-row>
+        <b-row>
+          <b-col sm="3">
             <label for="txtPlayer">Player Name</label>
           </b-col>
           <b-col sm="9">
-            <b-form-select id="txtPlayer" :options="players" v-model="player_name"></b-form-select>
+            <b-form-select id="txtPlayer" :options="select_world.players" v-model="player_name">
+            </b-form-select>
           </b-col>
         </b-row>
         <b-row>
@@ -183,7 +192,8 @@ PbrtCraft Dashbroad
   var app = new Vue({
     el: '#app',
     data: {
-      players: [],
+      worlds: [],
+      select_world: null,
       player_name: "",
       sample: "16",
       radius: "4",
@@ -217,9 +227,15 @@ PbrtCraft Dashbroad
       },
     },
     created: function () {
-      this.$http.post("/getuser").then(function (r) {
-        this.players = r.data;
-        this.player_name = this.players[0];
+      this.$http.post("/getworld").then(function (r) {
+        this.worlds = r.data;
+        this.worlds.forEach(function (world) {
+          world.text = world.name;
+          world.value = world;
+        })
+        // World should at least exists one
+        this.select_world = this.worlds[0];
+        this.player_name = this.worlds[0].players[0];
       });
       this.$http.post("/gettype").then(function (r) {
         this.camera_types = r.data.camera;
@@ -237,6 +253,7 @@ PbrtCraft Dashbroad
       render: function () {
         this.can_render = false;
         this.$http.post("/render", {
+          world: this.select_world.path,
           sample: this.sample,
           radius: this.radius,
           method: this.method,

@@ -2,27 +2,75 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"path"
+	"path/filepath"
+	"runtime"
 	"strings"
 )
 
-var players []string
+// World stores data of minecraft world
+type World struct {
+	Name    string   `json:"name"`
+	Path    string   `json:"path"`
+	Players []string `json:"players"`
+}
 
-func initPlayer(mcDir string) error {
-	var err error
-	players, err = listUsers(mcDir)
+// NewWorld return new minecraft world info
+func NewWorld(dir string) (*World, error) {
+	players, err := listUsers(dir)
 	if err != nil {
-		return fmt.Errorf("app.main.initPlayer: %s", err)
+		return nil, fmt.Errorf("app.main.NewWorld: %s", err)
+	}
+
+	return &World{
+		Players: players,
+		Name:    filepath.Base(dir),
+		Path:    dir,
+	}, nil
+}
+
+var worlds []*World
+
+func initSingleWorld(mcDir string) error {
+	world, err := NewWorld(mcDir)
+	if err != nil {
+		return fmt.Errorf("app.main.initSingleWorld: %s", err)
+	}
+	worlds = []*World{world}
+	return nil
+}
+
+func initClientWorlds() error {
+	mcWorldsDir, err := findMinecraft()
+	if err != nil {
+		return fmt.Errorf("app.main.initClientWorlds: %s", err)
+	}
+
+	worldFolders, err := listWorlds(mcWorldsDir)
+	if err != nil {
+		return fmt.Errorf("app.main.initClientWorlds: %s", err)
+	}
+
+	worlds = nil
+	for _, folder := range worldFolders {
+		mcDir := path.Join(mcWorldsDir, folder)
+		world, err := NewWorld(mcDir)
+		if err != nil {
+			return fmt.Errorf("app.main.initClientWorlds: %s", err)
+		}
+		worlds = append(worlds, world)
 	}
 	return nil
 }
 
-func usersHandler(w http.ResponseWriter, r *http.Request) {
-	bytes, err := json.Marshal(players)
+func worldsHandler(w http.ResponseWriter, r *http.Request) {
+	bytes, err := json.Marshal(worlds)
 	if err != nil {
 		log.Println(err)
 		fmt.Fprint(w, "[]")
@@ -30,6 +78,44 @@ func usersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Fprint(w, string(bytes))
+}
+
+// ErrMinecraftClientNotFound returned when minecraft client folder not found
+var ErrMinecraftClientNotFound = errors.New("Minecraft client folder not found")
+
+func findMinecraft() (string, error) {
+	var mcDir string
+	if runtime.GOOS == "windows" {
+		mcDir = path.Join(os.Getenv("APPDATA"), ".minecraft")
+	} else if runtime.GOOS == "linux" {
+		mcDir = path.Join(os.Getenv("HOME"), ".minecraft")
+	} else if runtime.GOOS == "darwin" {
+		mcDir = path.Join(os.Getenv("HOME"), "Library", "Application Support", "minecraft")
+	}
+
+	if mcDir == "" {
+		return "", ErrMinecraftClientNotFound
+	}
+
+	if _, err := os.Stat(mcDir); os.IsNotExist(err) {
+		return "", ErrMinecraftClientNotFound
+	}
+	return mcDir, nil
+}
+
+func listWorlds(mcDir string) ([]string, error) {
+	saveDir := path.Join(mcDir, "saves")
+	folders, err := ioutil.ReadDir(saveDir)
+	if err != nil {
+		return nil, fmt.Errorf("app.listWorlds: %s", err)
+	}
+	ret := []string{}
+	for _, folder := range folders {
+		if folder.IsDir() {
+			ret = append(ret, folder.Name())
+		}
+	}
+	return ret, nil
 }
 
 func listUsers(mcDir string) ([]string, error) {

@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"path"
-	"path/filepath"
 	"strconv"
 
 	"github.com/PbrtCraft/pbrtcraftdrv/filetree"
@@ -75,19 +74,9 @@ func filesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func renderHandler(w http.ResponseWriter, r *http.Request) {
-	var err error
-	absWorldPath, err := filepath.Abs(path.Join(appconf.Minecraft.Directory, "world"))
-	if err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	rc := mcwdrv.RenderConfig{
-		World: absWorldPath,
-	}
 	decoder := json.NewDecoder(r.Body)
 	var t struct {
+		World       string         `json:"world"`
 		Player      string         `json:"player"`
 		Sample      string         `json:"sample"`
 		Radius      string         `json:"radius"`
@@ -95,12 +84,21 @@ func renderHandler(w http.ResponseWriter, r *http.Request) {
 		Camera      mcwdrv.Class   `json:"camera"`
 		Phenomenons []mcwdrv.Class `json:"phenomenons"`
 	}
-	err = decoder.Decode(&t)
+	err := decoder.Decode(&t)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	rc := mcwdrv.RenderConfig{
+		World:       t.World,
+		Player:      t.Player,
+		Method:      t.Method,
+		Camera:      t.Camera,
+		Phenomenons: t.Phenomenons,
+	}
+
+	log.Println("PATH:", t.World)
 
 	rc.Sample, err = strconv.Atoi(t.Sample)
 	if err != nil {
@@ -114,11 +112,6 @@ func renderHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	rc.Player = t.Player
-	rc.Method = t.Method
-	rc.Camera = t.Camera
-	rc.Phenomenons = t.Phenomenons
 
 	err = mcwDriver.Compile(rc)
 	if err != nil {
@@ -195,13 +188,19 @@ func main() {
 	}
 	log.Println("Start init srv config...DONE")
 
-	log.Println("Start init srv player....")
-	err = initPlayer(appconf.Minecraft.Directory)
+	log.Println("Start init srv worlds....")
+	if appconf.Minecraft.Directory == "" {
+		log.Println("init client worlds...")
+		err = initClientWorlds()
+	} else {
+		log.Println("init single world...")
+		err = initSingleWorld(appconf.Minecraft.Directory)
+	}
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	log.Println("Start init srv player...DONE")
+	log.Println("Start init srv worlds...DONE")
 
 	log.Println("Start reading python types...")
 	err = initTypes(appconf.PythonFile)
@@ -232,7 +231,7 @@ func main() {
 	http.HandleFunc("/getstatus", statusHandler)
 	http.HandleFunc("/getimg", imgHandler)
 	http.HandleFunc("/gettype", typesHandler)
-	http.HandleFunc("/getuser", usersHandler)
+	http.HandleFunc("/getworld", worldsHandler)
 	http.HandleFunc("/getfiles", getfilesHandler)
 	http.HandleFunc("/render", renderHandler)
 	http.HandleFunc("/stop", stopHandler)
