@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -17,6 +18,7 @@ import (
 var mcwDriver *mcwdrv.MCWDriver
 var appconf *appConfig
 var srvconf *srvConfig
+var srv http.Server
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl, err := template.New("").Delims("[[", "]]").
@@ -166,6 +168,11 @@ func imgHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, imgBase64)
 }
 
+func closeHandler(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("Bye bye"))
+	srv.Shutdown(context.TODO())
+}
+
 func main() {
 	var err error
 	appconfFilenamePtr := flag.String("appconf", "appconfig.yaml", "App Config filename")
@@ -224,30 +231,37 @@ func main() {
 	log.Println("Start init mc driver...DONE")
 
 	log.Println("Start init server...")
-	http.HandleFunc("/", mainHandler)
-	http.HandleFunc("/result", resultHandler)
-	http.HandleFunc("/files", filesHandler)
 
-	http.HandleFunc("/getstatus", statusHandler)
-	http.HandleFunc("/getimg", imgHandler)
-	http.HandleFunc("/gettype", typesHandler)
-	http.HandleFunc("/getworld", worldsHandler)
-	http.HandleFunc("/getfiles", getfilesHandler)
-	http.HandleFunc("/render", renderHandler)
-	http.HandleFunc("/stop", stopHandler)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", mainHandler)
+	mux.HandleFunc("/result", resultHandler)
+	mux.HandleFunc("/files", filesHandler)
 
-	http.HandleFunc("/log", logHandler)
-	http.HandleFunc("/log/list", listLogHandler)
-	http.HandleFunc("/log/get", getLogHandler)
-	http.HandleFunc("/log/delete", deleteLogHandler)
+	mux.HandleFunc("/getstatus", statusHandler)
+	mux.HandleFunc("/getimg", imgHandler)
+	mux.HandleFunc("/gettype", typesHandler)
+	mux.HandleFunc("/getworld", worldsHandler)
+	mux.HandleFunc("/getfiles", getfilesHandler)
+	mux.HandleFunc("/render", renderHandler)
+	mux.HandleFunc("/stop", stopHandler)
+	mux.HandleFunc("/close", closeHandler)
+
+	mux.HandleFunc("/log", logHandler)
+	mux.HandleFunc("/log/list", listLogHandler)
+	mux.HandleFunc("/log/get", getLogHandler)
+	mux.HandleFunc("/log/delete", deleteLogHandler)
 
 	fsStatic := http.FileServer(http.Dir("static"))
-	http.Handle("/static/", http.StripPrefix("/static/", fsStatic))
+	mux.Handle("/static/", http.StripPrefix("/static/", fsStatic))
 
 	fsScenes := http.FileServer(http.Dir(path.Join(appconf.Path.Workdir, "scenes")))
-	http.Handle("/scenes/", http.StripPrefix("/scenes/", fsScenes))
+	mux.Handle("/scenes/", http.StripPrefix("/scenes/", fsScenes))
 	log.Println("Start init server...DONE")
 
 	log.Printf("Start listen at :%s...", srvconf.Port)
-	http.ListenAndServe(":"+srvconf.Port, nil)
+	srv = http.Server{Addr: ":" + srvconf.Port, Handler: mux}
+	err = srv.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
+		log.Println(err)
+	}
 }
