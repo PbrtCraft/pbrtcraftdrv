@@ -18,6 +18,16 @@ PbrtCraft Dashbroad
         </b-row>
         <b-row>
           <b-col sm="3">
+            <label>Select World</label>
+          </b-col>
+          <b-col sm="9">
+            <b-img class="rounded float-right" :src="'data:image/jpeg;base64,' + select_world.icon">
+            </b-img>
+            Path: {{select_world.path}}
+          </b-col>
+        </b-row>
+        <b-row>
+          <b-col sm="3">
             <label for="txtPlayer">Player Name</label>
           </b-col>
           <b-col sm="9">

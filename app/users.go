@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -52,6 +53,7 @@ func writeUUIDCache() error {
 type World struct {
 	Name    string   `json:"name"`
 	Path    string   `json:"path"`
+	Icon    string   `json:"icon"`
 	Players []string `json:"players"`
 }
 
@@ -62,9 +64,17 @@ func NewWorld(dir string) (*World, error) {
 		return nil, fmt.Errorf("app.main.NewWorld: %s", err)
 	}
 
+	iconBase64 := ""
+	bytes, err := ioutil.ReadFile(path.Join(dir, "icon.png"))
+	if err != nil {
+		iconBase64 = ""
+	}
+	iconBase64 = base64.StdEncoding.EncodeToString(bytes)
+
 	return &World{
 		Players: players,
 		Name:    filepath.Base(dir),
+		Icon:    iconBase64,
 		Path:    dir,
 	}, nil
 }
