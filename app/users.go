@@ -14,6 +14,40 @@ import (
 	"strings"
 )
 
+var (
+	uuidNameMap map[string]string
+)
+
+func init() {
+	if err := readUUIDCache(); err != nil {
+		uuidNameMap = map[string]string{}
+	}
+}
+
+func readUUIDCache() error {
+	bs, err := ioutil.ReadFile("usercache.json")
+	if err != nil {
+		return fmt.Errorf("app.main.readUUIDCache: %s", err)
+	}
+	err = json.Unmarshal(bs, &uuidNameMap)
+	if err != nil {
+		return fmt.Errorf("app.main.readUUIDCache: %s", err)
+	}
+	return nil
+}
+
+func writeUUIDCache() error {
+	bs, err := json.Marshal(uuidNameMap)
+	if err != nil {
+		return fmt.Errorf("app.main.writeUUIDCache: %s", err)
+	}
+	err = ioutil.WriteFile("usercache.json", bs, 0666)
+	if err != nil {
+		return fmt.Errorf("app.main.writeUUIDCache: %s", err)
+	}
+	return nil
+}
+
 // World stores data of minecraft world
 type World struct {
 	Name    string   `json:"name"`
@@ -59,13 +93,15 @@ func initClientWorlds() error {
 
 	worlds = nil
 	for _, folder := range worldFolders {
-		mcDir := path.Join(mcWorldsDir, folder)
+		mcDir := path.Join(mcWorldsDir, "saves", folder)
 		world, err := NewWorld(mcDir)
 		if err != nil {
-			return fmt.Errorf("app.main.initClientWorlds: %s", err)
+			log.Println("Read World:", folder, err)
+			continue
 		}
 		worlds = append(worlds, world)
 	}
+	log.Println("Get", len(worlds), "world(s)")
 	return nil
 }
 
@@ -119,7 +155,7 @@ func listWorlds(mcDir string) ([]string, error) {
 }
 
 func listUsers(mcDir string) ([]string, error) {
-	files, err := ioutil.ReadDir(path.Join(mcDir, "world", "playerdata"))
+	files, err := ioutil.ReadDir(path.Join(mcDir, "playerdata"))
 	if err != nil {
 		return nil, fmt.Errorf("app.listUsers: %s", err)
 	}
@@ -142,6 +178,10 @@ func listUsers(mcDir string) ([]string, error) {
 }
 
 func uuidToName(uuid string) (string, error) {
+	if name, exist := uuidNameMap[uuid]; exist {
+		return name, nil
+	}
+
 	url := fmt.Sprintf("https://api.mojang.com/user/profiles/%s/names",
 		strings.Replace(uuid, "-", "", -1))
 	client := http.Client{}
@@ -175,5 +215,13 @@ func uuidToName(uuid string) (string, error) {
 	if len(tmp) == 0 {
 		return "", fmt.Errorf("app.uuidToName: cannot found player by uuid %s", uuid)
 	}
+
+	uuidNameMap[uuid] = tmp[0].Name
+
+	err = writeUUIDCache()
+	if err != nil {
+		log.Println(err)
+	}
+
 	return tmp[0].Name, nil
 }

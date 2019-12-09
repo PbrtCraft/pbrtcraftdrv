@@ -97,6 +97,11 @@ func NewMCWDriver(workdir, mc2pbrtMain, pbrtBin, logDir string) (*MCWDriver, err
 		return nil, fmt.Errorf("mcwdrv.NewMCWDriver: %s", err)
 	}
 
+	err = os.MkdirAll(ret.path.logDir, os.ModePerm)
+	if err != nil {
+		return nil, fmt.Errorf("mcwdrv.NewMCWDriver: %s", err)
+	}
+
 	return ret, nil
 }
 
@@ -148,6 +153,7 @@ func (drv *MCWDriver) compile() {
 	drv.cmdMc2pbrt.Stderr = logFile
 	err = drv.cmdMc2pbrt.Run()
 	if err != nil {
+		log.Printf("mc2pbrt: %s", err)
 		drv.lastCompile.err = fmt.Errorf("mc2pbrt: %s", err)
 		return
 	}
@@ -162,6 +168,7 @@ func (drv *MCWDriver) compile() {
 	drv.cmdPbrt.Stderr = logFile
 	err = drv.cmdPbrt.Run()
 	if err != nil {
+		log.Printf("pbrt: %s", err)
 		drv.lastCompile.err = fmt.Errorf("pbrt: %s", err)
 		return
 	}
@@ -222,6 +229,12 @@ func (drv *MCWDriver) ListLogs() ([]string, error) {
 			continue
 		}
 		ret = append(ret, file.Name())
+	}
+
+	// Reverse the order, let the most recent log be the first file
+	l := len(ret)
+	for i := 0; i < l-i-1; i++ {
+		ret[i], ret[l-i-1] = ret[l-i-1], ret[i]
 	}
 	return ret, nil
 }
