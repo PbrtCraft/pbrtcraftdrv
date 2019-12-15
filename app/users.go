@@ -71,11 +71,16 @@ func NewWorld(dir string) (*World, error) {
 	}
 	iconBase64 = base64.StdEncoding.EncodeToString(bytes)
 
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return nil, fmt.Errorf("app.main.NewWorld: %s", err)
+	}
+
 	return &World{
 		Players: players,
 		Name:    filepath.Base(dir),
 		Icon:    iconBase64,
-		Path:    dir,
+		Path:    absDir,
 	}, nil
 }
 

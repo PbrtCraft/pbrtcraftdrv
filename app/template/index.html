@@ -48,6 +48,22 @@ PbrtCraft Dashbroad
       <b-container fluid>
         <b-row>
           <b-col sm="3">
+            <label for="txtWidth">Width</label>
+          </b-col>
+          <b-col sm="9">
+            <b-form-input id="txtWidth" type="number" min="1" v-model="width"></b-form-input>
+          </b-col>
+        </b-row>
+        <b-row>
+          <b-col sm="3">
+            <label for="txtHeight">Height</label>
+          </b-col>
+          <b-col sm="9">
+            <b-form-input id="txtHeight" type="number" min="1" v-model="height"></b-form-input>
+          </b-col>
+        </b-row>
+        <b-row>
+          <b-col sm="3">
             <label for="txtSample">Sample</label>
           </b-col>
           <b-col sm="9">
@@ -228,6 +244,8 @@ PbrtCraft Dashbroad
         name: "",
         params: {},
       },
+      width: "960",
+      height: "480",
       render_src: "https://via.placeholder.com/600",
       timer: null,
       can_render: true,
@@ -264,6 +282,8 @@ PbrtCraft Dashbroad
         this.can_render = false;
         this.$http.post("/render", {
           world: this.select_world.path,
+          width: this.width,
+          height: this.height,
           sample: this.sample,
           radius: this.radius,
           method: this.method,

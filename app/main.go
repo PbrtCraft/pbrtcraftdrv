@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"path"
-	"strconv"
 
 	"github.com/PbrtCraft/pbrtcraftdrv/filetree"
 	"github.com/PbrtCraft/pbrtcraftdrv/mcwdrv"
@@ -80,8 +79,10 @@ func renderHandler(w http.ResponseWriter, r *http.Request) {
 	var t struct {
 		World       string         `json:"world"`
 		Player      string         `json:"player"`
-		Sample      string         `json:"sample"`
-		Radius      string         `json:"radius"`
+		Width       int            `json:"width,string"`
+		Height      int            `json:"height,string"`
+		Sample      int            `json:"sample,string"`
+		Radius      int            `json:"radius,string"`
 		Method      mcwdrv.Class   `json:"method"`
 		Camera      mcwdrv.Class   `json:"camera"`
 		Phenomenons []mcwdrv.Class `json:"phenomenons"`
@@ -95,25 +96,16 @@ func renderHandler(w http.ResponseWriter, r *http.Request) {
 	rc := mcwdrv.RenderConfig{
 		World:       t.World,
 		Player:      t.Player,
+		Sample:      t.Sample,
+		Radius:      t.Radius,
 		Method:      t.Method,
 		Camera:      t.Camera,
 		Phenomenons: t.Phenomenons,
 	}
+	rc.Resolution.Width = t.Width
+	rc.Resolution.Height = t.Height
 
 	log.Println("PATH:", t.World)
-
-	rc.Sample, err = strconv.Atoi(t.Sample)
-	if err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	rc.Radius, err = strconv.Atoi(t.Radius)
-	if err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 
 	err = mcwDriver.Compile(rc)
 	if err != nil {

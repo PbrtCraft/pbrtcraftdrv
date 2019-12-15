@@ -61,10 +61,14 @@ type Class struct {
 // RenderConfig is Minecraft scene render config for mc2pbrt
 // more info ref: https://github.com/PbrtCraft/mc2pbrt
 type RenderConfig struct {
-	World  string
-	Player string
-	Sample int
-	Radius int
+	World      string
+	Player     string
+	Sample     int
+	Radius     int
+	Resolution struct {
+		Width  int
+		Height int
+	}
 
 	Method      Class
 	Camera      Class

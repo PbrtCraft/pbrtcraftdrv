@@ -8,4 +8,4 @@ python_file:
   phenomenon: ../../mc2pbrt/mc2pbrt/phenomenon.py
   method: ../../mc2pbrt/mc2pbrt/method.py
 minecraft:
-  directory: ../../../Minecraft
+  directory: ../../../Minecraft/world
