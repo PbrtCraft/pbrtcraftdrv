@@ -1,15 +1,19 @@
 package mcwdrv
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,6 +37,12 @@ const (
 	StatusPbrt
 )
 
+// PbrtStatus stores current pbrt status
+type PbrtStatus struct {
+	AllSec   float64
+	LeaveSec float64
+}
+
 // MCWDriver manage mc2pbrt and pbrt to render a scene of minecraft
 type MCWDriver struct {
 	mutex      sync.Mutex
@@ -50,6 +60,8 @@ type MCWDriver struct {
 		pbrtBin     string
 		logDir      string
 	}
+
+	pbrtStatus *PbrtStatus
 }
 
 // Class is a type in Minecraft render config
@@ -168,8 +180,17 @@ func (drv *MCWDriver) compile() {
 	targetPbrt := path.Join(drv.path.workdir, "scenes", "target.pbrt")
 	drv.cmdPbrt = exec.Command(drv.path.pbrtBin, targetPbrt, "--outfile", "mc.png")
 	drv.cmdPbrt.Dir = drv.path.workdir
-	drv.cmdPbrt.Stdout = logFile
 	drv.cmdPbrt.Stderr = logFile
+
+	stdoutPipe, err := drv.cmdPbrt.StdoutPipe()
+	if err != nil {
+		log.Printf("pbrt: %s", err)
+		drv.lastCompile.err = fmt.Errorf("pbrt: %s", err)
+		return
+	}
+	go drv.pbrtReader(stdoutPipe)
+	// drv.cmdPbrt.Stderr = logFile
+
 	err = drv.cmdPbrt.Run()
 	if err != nil {
 		log.Printf("pbrt: %s", err)
@@ -201,6 +222,11 @@ func (drv *MCWDriver) setStatus(s MCWStatus) {
 // GetStatus return the status of driver
 func (drv *MCWDriver) GetStatus() MCWStatus {
 	return drv.status
+}
+
+// GetPbrtStatus return status of pbrt
+func (drv *MCWDriver) GetPbrtStatus() *PbrtStatus {
+	return drv.pbrtStatus
 }
 
 // GetLastCompileResult return the last render err
@@ -274,4 +300,104 @@ func (drv *MCWDriver) writeRenderConfig(rc RenderConfig) error {
 		return fmt.Errorf("mcwdrv.writeRenderConfig: %s", err)
 	}
 	return nil
+}
+
+func (drv *MCWDriver) pbrtReader(reader io.Reader) {
+	var out []byte
+	buf := make([]byte, 12, 12)
+	for {
+		n, err := reader.Read(buf[:])
+		out = append(out, buf[:n]...)
+		if n > 0 {
+			for {
+				newLine := findLine(out)
+				if newLine == -1 {
+					break
+				}
+				log.Println("input", string(out[:newLine]))
+				ps, err := parsePbrtStatus(string(out[:newLine]))
+				if err == nil {
+					drv.pbrtStatus = ps
+					log.Println("get", *ps)
+				}
+				out = out[newLine+1:]
+			}
+		}
+		if err != nil {
+			// Read returns io.EOF at the end of file, which is not an error for us
+			if err == io.EOF {
+				err = nil
+			}
+			break
+		}
+	}
+}
+
+func findLine(val []byte) int {
+	nl := bytes.Index(val, []byte("\n"))
+	rl := bytes.Index(val, []byte("\r"))
+	if nl == -1 && rl == -1 {
+		return -1
+	} else if nl == -1 {
+		return rl
+	} else if rl == -1 {
+		return nl
+	}
+	if nl > rl {
+		return rl
+	}
+	return nl
+}
+
+// ErrPbrtStatusPatternNotMatch occur if status string not math pattern
+var ErrPbrtStatusPatternNotMatch = errors.New("Pbrt status pattern not match")
+
+// TODO: use more strict pattern
+// Example: Rendering: [++++++              ]  (0.8s|1.1s)
+var pbrtWorkingStatusPattern = regexp.MustCompile(`Rendering: \[\+* *\]  \(.*s\|.*s\)`)
+var pbrtEndingStatusPattern = regexp.MustCompile(`Rendering: \[\+* *\]  \(.*s\)`)
+
+func parsePbrtStatus(s string) (*PbrtStatus, error) {
+	if pbrtWorkingStatusPattern.MatchString(s) {
+		return parseWorkingPbrtStatus(s)
+	} else if pbrtEndingStatusPattern.MatchString(s) {
+		return parseEndingPbrtStatus(s)
+	}
+	return nil, fmt.Errorf("mcwdrv.parsePbrtStatus: %s", ErrPbrtStatusPatternNotMatch)
+}
+
+func parseWorkingPbrtStatus(s string) (*PbrtStatus, error) {
+	leftIdx := strings.Index(s, "(")
+	midIdx := strings.Index(s[leftIdx:], "s|") + leftIdx
+	rightIdx := strings.Index(s[leftIdx:], "s)") + leftIdx
+
+	allSecStr := s[leftIdx+1 : midIdx]
+	leaveSecStr := s[midIdx+2 : rightIdx]
+	allSec, err := strconv.ParseFloat(allSecStr, 64)
+	if err != nil {
+		return nil, fmt.Errorf("mcwdrv.parseWorkingPbrtStatus: %s", err)
+	}
+	leaveSec, err := strconv.ParseFloat(leaveSecStr, 64)
+	if err != nil {
+		return nil, fmt.Errorf("mcwdrv.parseWorkingPbrtStatus: %s", err)
+	}
+	return &PbrtStatus{
+		AllSec:   allSec,
+		LeaveSec: leaveSec,
+	}, nil
+}
+
+func parseEndingPbrtStatus(s string) (*PbrtStatus, error) {
+	leftIdx := strings.Index(s, "(")
+	rightIdx := strings.Index(s[leftIdx:], "s)") + leftIdx
+
+	allSecStr := s[leftIdx+1 : rightIdx]
+	allSec, err := strconv.ParseFloat(allSecStr, 64)
+	if err != nil {
+		return nil, fmt.Errorf("mcwdrv.parseWorkingPbrtStatus: %s", err)
+	}
+	return &PbrtStatus{
+		AllSec:   allSec,
+		LeaveSec: 0,
+	}, nil
 }
