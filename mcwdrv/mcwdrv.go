@@ -39,8 +39,8 @@ const (
 
 // PbrtStatus stores current pbrt status
 type PbrtStatus struct {
-	AllSec   float64
-	LeaveSec float64
+	AllSec   float64 `json:"all_sec"`
+	LeaveSec float64 `json:"leave_sec"`
 }
 
 // MCWDriver manage mc2pbrt and pbrt to render a scene of minecraft

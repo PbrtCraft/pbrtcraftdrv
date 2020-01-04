@@ -295,15 +295,23 @@ PbrtCraft Dashbroad
       },
       updateStatus: function () {
         this.$http.get("/getstatus").then(function (r) {
-          status = r.body;
+          tmp = r.body;
+          status = tmp.driver_status;
           this.render_status.show = status != "idle";
           this.can_render = status == "idle";
           if (status == "idle") {
             this.render_status.msg = "";
             this.updateImg();
             clearInterval(this.timer)
-          } else if (status == "mc2pbrt" || status == "pbrt") {
-            this.render_status.msg = "Running " + status + "...";
+          } else if (status == "mc2pbrt") {
+            this.render_status.msg = "Running mc2pbrt...";
+          } else if (status == "pbrt") {
+            if (tmp.body != null) {
+              this.render_status.msg = "Running pbrt..." +
+                "please wait for " + tmp.body.leave_sec + "s";
+            } else {
+              this.render_status.msg = "Running pbrt...";
+            }
           }
         })
       },

@@ -137,18 +137,29 @@ func getfilesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func statusHandler(w http.ResponseWriter, r *http.Request) {
-	str := ""
+	var tmp struct {
+		DriverStatus string      `json:"driver_status"`
+		Body         interface{} `json:"body"`
+	}
 	switch mcwDriver.GetStatus() {
 	case mcwdrv.StatusIdle:
-		str = "idle"
+		tmp.DriverStatus = "idle"
 	case mcwdrv.StatusReady:
-		str = "ready"
+		tmp.DriverStatus = "ready"
 	case mcwdrv.StatusMc2pbrt:
-		str = "mc2pbrt"
+		tmp.DriverStatus = "mc2pbrt"
 	case mcwdrv.StatusPbrt:
-		str = "pbrt"
+		tmp.DriverStatus = "pbrt"
+		tmp.Body = mcwDriver.GetPbrtStatus()
 	}
-	fmt.Fprintf(w, str)
+
+	bs, err := json.Marshal(tmp)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprintf(w, string(bs))
 }
 
 func imgHandler(w http.ResponseWriter, r *http.Request) {
