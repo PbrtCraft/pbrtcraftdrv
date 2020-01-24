@@ -159,7 +159,7 @@ PbrtCraft Dashbroad
   <div v-for="param in types[names.indexOf(value.name)].init_func.params">
     <b-form-group :label="param.name" :label-for="id + '-param-' + param.name">
       <b-form-input :id="id + '-param-' + param.name" @input="updateParams(); $forceUpdate()"
-        v-model="gparams[value.name][param.name]" required>
+        v-model="gparams_str[value.name][param.name]" required>
       </b-form-input>
     </b-form-group>
   </div>
@@ -170,6 +170,7 @@ PbrtCraft Dashbroad
       return {
         names: [],
         gparams: {},
+        gparams_str: {},
       }
     },
     watch: {
@@ -179,8 +180,10 @@ PbrtCraft Dashbroad
           name = tp.name;
           that.names.push(name);
           that.gparams[name] = {};
+          that.gparams_str[name] = {};
           tp.init_func.params.forEach(function (param) {
             that.gparams[name][param.name] = param.default_value;
+            that.gparams_str[name][param.name] = param.default_value;
           });
         });
         if (this.names.length) {
@@ -199,15 +202,16 @@ PbrtCraft Dashbroad
       updateParams: function () {
         console.log("update params")
         params = this.gparams[this.value.name];
+        params_str = this.gparams_str[this.value.name];
         console.log(params)
         index = this.names.indexOf(this.value.name)
         this.types[index].init_func.params.forEach(function (param) {
           name = param.name;
           console.log(name, params[name])
           if (param.type == "int") {
-            params[name] = parseInt(params[name]);
+            params[name] = parseInt(params_str[name]);
           } else if (param.type == "float") {
-            params[name] = parseFloat(params[name]);
+            params[name] = parseFloat(params_str[name]);
           }
         });
         this.value.params = params;
