@@ -1,12 +1,12 @@
 path:
-  workdir: ../../workdir/
-  mc2pbrt_main: ../../mc2pbrt/mc2pbrt/main.py
-  pbrt_bin: ../../pbrt-mc-build/pbrt
-  log_dir: ../../workdir/logs
+  workdir: ../workdir/
+  mc2pbrt_main: ../mc2pbrt/mc2pbrt/main.py
+  pbrt_bin: ../pbrt-mc-build/pbrt
+  log_dir: ../workdir/logs
 python_file:
-  camera: ../../mc2pbrt/mc2pbrt/camera.py
-  phenomenon: ../../mc2pbrt/mc2pbrt/phenomenon.py
-  method: ../../mc2pbrt/mc2pbrt/method.py
+  camera: ../mc2pbrt/mc2pbrt/camera.py
+  phenomenon: ../mc2pbrt/mc2pbrt/phenomenon.py
+  method: ../mc2pbrt/mc2pbrt/method.py
 minecraft:
   directory:
 srv:
