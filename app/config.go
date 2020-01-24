@@ -20,10 +20,10 @@ type appConfig struct {
 	Minecraft struct {
 		Directory string `yaml:"directory"`
 	} `yaml:"minecraft"`
-}
 
-type srvConfig struct {
-	Port string `json:"port"`
+	Srv struct {
+		Port string `yaml:"port"`
+	} `yaml:"srv"`
 }
 
 func getAppConfig(filename string) (*appConfig, error) {
@@ -36,20 +36,6 @@ func getAppConfig(filename string) (*appConfig, error) {
 	err = yaml.Unmarshal(bytes, &c)
 	if err != nil {
 		return nil, fmt.Errorf("app.getAppConfig: %s", err)
-	}
-	return &c, nil
-}
-
-func getSrvConfig(filename string) (*srvConfig, error) {
-	bytes, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, fmt.Errorf("app.getSrvConfig: %s", err)
-	}
-
-	var c srvConfig
-	err = yaml.Unmarshal(bytes, &c)
-	if err != nil {
-		return nil, fmt.Errorf("app.getSrvConfig: %s", err)
 	}
 	return &c, nil
 }

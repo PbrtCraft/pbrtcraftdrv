@@ -16,7 +16,6 @@ import (
 
 var mcwDriver *mcwdrv.MCWDriver
 var appconf *appConfig
-var srvconf *srvConfig
 var srv http.Server
 
 func mainHandler(w http.ResponseWriter, r *http.Request) {
@@ -179,7 +178,6 @@ func closeHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	var err error
 	appconfFilenamePtr := flag.String("appconf", "appconfig.yaml", "App Config filename")
-	srvconfFilenamePtr := flag.String("srvconf", "srvconfig.yaml", "Server Config filename")
 	flag.Parse()
 
 	log.Println("Start init app config...")
@@ -189,14 +187,6 @@ func main() {
 		return
 	}
 	log.Println("Start init app config...DONE")
-
-	log.Println("Start init srv config...")
-	srvconf, err = getSrvConfig(*srvconfFilenamePtr)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	log.Println("Start init srv config...DONE")
 
 	log.Println("Start init srv worlds....")
 	if appconf.Minecraft.Directory == "" {
@@ -261,8 +251,9 @@ func main() {
 	mux.Handle("/scenes/", http.StripPrefix("/scenes/", fsScenes))
 	log.Println("Start init server...DONE")
 
-	log.Printf("Start listen at :%s...", srvconf.Port)
-	srv = http.Server{Addr: ":" + srvconf.Port, Handler: mux}
+	port := appconf.Srv.Port
+	log.Printf("Start listen at :%s...", port)
+	srv = http.Server{Addr: ":" + port, Handler: mux}
 	err = srv.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		log.Println(err)

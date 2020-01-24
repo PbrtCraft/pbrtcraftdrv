@@ -9,3 +9,5 @@ python_file:
   method: ../../mc2pbrt/mc2pbrt/method.py
 minecraft:
   directory:
+srv:
+  port: 8080
