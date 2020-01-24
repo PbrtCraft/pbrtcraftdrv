@@ -119,7 +119,7 @@ func stopHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getfilesHandler(w http.ResponseWriter, r *http.Request) {
-	ft, err := filetree.GetFolder(path.Join(appconf.Path.Workdir, "scenes"))
+	ft, err := filetree.GetFolder(path.Join(appconf.MWCDriver.Workdir, "scenes"))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -211,12 +211,7 @@ func main() {
 	log.Println("Start reading python types...DONE")
 
 	log.Println("Start init mc driver...")
-	mcwDriver, err = mcwdrv.NewMCWDriver(
-		appconf.Path.Workdir,
-		appconf.Path.Mc2pbrtMain,
-		appconf.Path.PbrtBin,
-		appconf.Path.LogDir,
-	)
+	mcwDriver, err = mcwdrv.NewMCWDriver(appconf.MWCDriver)
 	if err != nil {
 		log.Println(err)
 		return
@@ -247,7 +242,7 @@ func main() {
 	fsStatic := http.FileServer(http.Dir("static"))
 	mux.Handle("/static/", http.StripPrefix("/static/", fsStatic))
 
-	fsScenes := http.FileServer(http.Dir(path.Join(appconf.Path.Workdir, "scenes")))
+	fsScenes := http.FileServer(http.Dir(path.Join(appconf.MWCDriver.Workdir, "scenes")))
 	mux.Handle("/scenes/", http.StripPrefix("/scenes/", fsScenes))
 	log.Println("Start init server...DONE")
 

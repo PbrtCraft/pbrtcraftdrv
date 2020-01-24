@@ -4,16 +4,12 @@ import (
 	"fmt"
 	"io/ioutil"
 
+	"github.com/PbrtCraft/pbrtcraftdrv/mcwdrv"
 	yaml "gopkg.in/yaml.v2"
 )
 
 type appConfig struct {
-	Path struct {
-		Workdir     string `yaml:"workdir"`      // Path to workdir
-		Mc2pbrtMain string `yaml:"mc2pbrt_main"` // Path to mc2pbrt/main.py
-		PbrtBin     string `yaml:"pbrt_bin"`     // Path to pbrt binary
-		LogDir      string `yaml:"log_dir"`      // mcwdrv log directory
-	} `yaml:"path"`
+	MWCDriver *mcwdrv.Config `yaml:"mcw_driver"`
 
 	PythonFile typeFile `yaml:"python_file"`
 

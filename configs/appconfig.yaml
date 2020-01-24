@@ -1,4 +1,4 @@
-path:
+mcw_driver:
   workdir: ../workdir/
   mc2pbrt_main: ../mc2pbrt/mc2pbrt/main.py
   pbrt_bin: ../pbrt-mc-build/pbrt

@@ -90,25 +90,33 @@ type RenderConfig struct {
 // ErrDriverNotIdel occur when try to compile when compiling
 var ErrDriverNotIdel = fmt.Errorf("mcwdrv.Compile: Driver status not idle")
 
+// Config for MCWDriver
+type Config struct {
+	Workdir     string `yaml:"workdir"`      // Path to workdir
+	Mc2pbrtMain string `yaml:"mc2pbrt_main"` // Path to mc2pbrt/main.py
+	PbrtBin     string `yaml:"pbrt_bin"`     // Path to pbrt binary
+	LogDir      string `yaml:"log_dir"`      // mcwdrv log directory
+}
+
 // NewMCWDriver return a minecraft world driver
-func NewMCWDriver(workdir, mc2pbrtMain, pbrtBin, logDir string) (*MCWDriver, error) {
+func NewMCWDriver(conf *Config) (*MCWDriver, error) {
 	ret := &MCWDriver{}
 	var err error
-	ret.path.mc2pbrtMain, err = filepath.Abs(mc2pbrtMain)
+	ret.path.mc2pbrtMain, err = filepath.Abs(conf.Mc2pbrtMain)
 	if err != nil {
 		return nil, fmt.Errorf("mcwdrv.NewMCWDriver: %s", err)
 	}
-	ret.path.pbrtBin, err = filepath.Abs(pbrtBin)
-	if err != nil {
-		return nil, fmt.Errorf("mcwdrv.NewMCWDriver: %s", err)
-	}
-
-	ret.path.workdir, err = filepath.Abs(workdir)
+	ret.path.pbrtBin, err = filepath.Abs(conf.PbrtBin)
 	if err != nil {
 		return nil, fmt.Errorf("mcwdrv.NewMCWDriver: %s", err)
 	}
 
-	ret.path.logDir, err = filepath.Abs(logDir)
+	ret.path.workdir, err = filepath.Abs(conf.Workdir)
+	if err != nil {
+		return nil, fmt.Errorf("mcwdrv.NewMCWDriver: %s", err)
+	}
+
+	ret.path.logDir, err = filepath.Abs(conf.LogDir)
 	if err != nil {
 		return nil, fmt.Errorf("mcwdrv.NewMCWDriver: %s", err)
 	}
