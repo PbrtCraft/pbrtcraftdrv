@@ -4,12 +4,11 @@ Pbrtcraftdrv Provide Operate GUI for PbrtCraft.
 
 ![](demo.png)
 
-## Build and execute
+## Build
 
 ```bash
-$ cd app
-$ go build
-$ ./app
+$ cd build
+$ ./build ../../pbrtcraftdrv-build
 ```
 
 ## Pages 
@@ -21,19 +20,22 @@ $ ./app
 
 ## Config
 
-### App Config File
+### Config File
 
-* Filename: `appconfig.yaml`
-  
-* Values: 
-  * path:
-    - workdir: Some temp file
-    - mc2pbrt_main: Mc2pbrt compiled binary file or executed command 
-    - pbrt_bin: Pbrt compiled binary file
-    - log_dir: Logging file directory 
+* Example Config File: [configs/appconfig.yaml](configs/appconfig.yaml)
 
-### Server Config File
+#### dictionary content
 
-* Filename: `srvconfig.yaml`
-* Values:
-  - Port: GUI web server port
+- mcw_driver:
+  - workdir: Working diretcory.
+  - mc2pbrt_main: mc2pbrt execute file. It can ba an exe file or 
+  - pbrt_bin: Compiled pbrt-v3-minecraft binary.
+  - log_dir: Directory for log file.
+- python_file:
+  - camera: Path tp mc2pbrt camera's file.
+  - phenomenon: Path tp mc2pbrt phenomenon's file.
+  - method: Path tp mc2pbrt method's file.
+- minecraft:
+  - directory: Path to minecraft world directory. Leave empty for auto detection.
+- srv:
+  - port: Server Port.
